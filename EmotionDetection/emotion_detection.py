@@ -1,12 +1,20 @@
-﻿import requests
-
+﻿
+import requests
 
 def emotion_detector(text_to_analyze):
-    """
-    Analyze text using IBM Watson Emotion Detection API.
-    """
+    url = "https://sn-watson-emotion.labs.skills.network/v1/watson.runtime.nlp.v1/NlpService/EmotionPredict"
 
-    if not text_to_analyze or not text_to_analyze.strip():
+    headers = {
+        "grpc-metadata-mm-model-id": "emotion_aggregated-workflow_lang_en_stock"
+    }
+
+    response = requests.post(
+        url,
+        json={"raw_document": {"text": text_to_analyze}},
+        headers=headers
+    )
+
+    if response.status_code == 400:
         return {
             "anger": None,
             "disgust": None,
@@ -16,48 +24,12 @@ def emotion_detector(text_to_analyze):
             "dominant_emotion": None
         }
 
-    url = "https://sn-watson-emotion.labs.skills.network/v1/watson.runtime.nlp.v1/NlpService/EmotionPredict"
+    response.raise_for_status()
 
-    headers = {
-        "grpc-metadata-mm-model-id": "emotion_aggregated-workflow"
-    }
+    emotions = response.json()["emotionPredictions"][0]["emotion"]
 
-    try:
-        response = requests.post(
-            url,
-            json={"raw_document": {"text": text_to_analyze}},
-            headers=headers,
-            timeout=30
-        )
+    dominant_emotion = max(emotions, key=emotions.get)
 
-        if response.status_code == 400:
-            return {
-                "anger": None,
-                "disgust": None,
-                "fear": None,
-                "joy": None,
-                "sadness": None,
-                "dominant_emotion": None
-            }
+    emotions["dominant_emotion"] = dominant_emotion
 
-        response.raise_for_status()
-
-        data = response.json()
-
-        emotions = data["emotionPredictions"][0]["emotion"]
-
-        dominant_emotion = max(emotions, key=emotions.get)
-
-        return {
-            "anger": emotions.get("anger"),
-            "disgust": emotions.get("disgust"),
-            "fear": emotions.get("fear"),
-            "joy": emotions.get("joy"),
-            "sadness": emotions.get("sadness"),
-            "dominant_emotion": dominant_emotion
-        }
-
-    except (requests.exceptions.RequestException, KeyError, IndexError, TypeError, ValueError) as error:
-        return {
-            "error": str(error)
-        }
+    return emotions
